@@ -66,10 +66,11 @@ class CondensedTree(object):
 
     """
     def __init__(self, condensed_tree_array, cluster_selection_method='eom',
-                 allow_single_cluster=False):
+                 allow_single_cluster=False, max_number_of_joined_clusters=None):
         self._raw_tree = condensed_tree_array
         self.cluster_selection_method = cluster_selection_method
         self.allow_single_cluster = allow_single_cluster
+        self.max_number_of_joined_clusters = max_number_of_joined_clusters
 
     def get_plot_data(self,
                       leaf_separation=1,
@@ -241,12 +242,15 @@ class CondensedTree(object):
             cluster_tree = self._raw_tree[self._raw_tree['child_size'] > 1]
             is_cluster = {cluster: True for cluster in node_list}
 
-            for node in node_list:
-                child_selection = (cluster_tree['parent'] == node)
-                subtree_stability = np.sum([stability[child] for
-                                            child in cluster_tree['child'][child_selection]])
+            sizes = {}
 
-                if subtree_stability > stability[node]:
+            for node in node_list:
+                child_selection = cluster_tree["parent"] == node
+                children = cluster_tree["child"][child_selection].tolist()
+                subtree_stability = sum(stability[child] for child in children)
+                sizes[node] = sum(sizes[child] for child in children) if children else 1
+
+                if (self.max_number_of_joined_clusters is not None and sizes[node] > self.max_number_of_joined_clusters) or subtree_stability > stability[node]:
                     is_cluster[node] = False
                     stability[node] = subtree_stability
                 else:
